@@ -1,18 +1,42 @@
 # frozen_string_literal: true
 
-require_relative "service"
+require_relative "reset_password_request_service"
+require_relative "reset_password_service"
 
 class UserController
-  def create(user_info)
-    Service.create_user(user_info) do |on|
-      on.success { puts "Success Handled" }
-      on.lied_about_age { |age| puts "The user lied about their age, no way they're #{age}" }
-      on.validation_error { |validation_errors| puts "Validation errors: #{validation_errors} " }
-      on.catastrophic_failure { puts "Oh Sh!t" }
+  def reset_password_request(params = {})
+    ResetPasswordRequestService.call(email: params[:email])
+    puts "We will send password reset information to the email provided if it exists."
+  end
+
+  def reset_password(params = {})
+    ResetPasswordService.call(
+      password: params[:password],
+      password_confirmation: params[:password_confirmation],
+      token: params[:token]
+    ) do |on|
+      on.password_mismatch { |message| password_mismatch(message) }
+      on.token_not_found { token_not_found }
+      on.token_expired { token_expired }
+      on.success { success }
     end
   end
-end
 
-UserController.new.create(name: "Bob", age: -1)
-UserController.new.create(name: "George", age: 30)
-UserController.new.create(name: "Rupert", age: 180)
+  private
+
+  def password_mismatch(message)
+    puts "Your passwords did not match: #{message}"
+  end
+
+  def token_not_found
+    puts "Password reset token was not valid"
+  end
+
+  def token_expired
+    puts "Your password reset link has expired"
+  end
+
+  def success
+    puts "Successfully updated your password"
+  end
+end
