@@ -3,7 +3,7 @@
 module HandleIt
   class EventRegistry
     CallingUnknownEvent = Class.new(RuntimeError)
-    MissingEventHandler = Class.new(RuntimeError)
+    InvalidEventHandlers = Class.new(RuntimeError)
 
     attr_accessor :event_handlers
 
@@ -28,23 +28,29 @@ module HandleIt
     end
 
     def validate_handlers!
-      return if @event_names.sort == @event_handlers.keys.sort
-      raise(
-        MissingEventHandler,
-        "Events missing handlers: #{@event_names - @event_handlers.keys}"
-      )
-    end
+      unhandled_events = (@event_names - @event_handlers.keys).sort
+      unknown_events = (@event_handlers.keys - @event_names).sort
 
-    def method_missing(event_name, &block)
-      if respond_to_missing?(event_name)
-        register_event(event_name, &block)
-      else
-        super
+      message = []
+
+      unless unhandled_events.empty?
+        message << "You forgot to handle these events:"
+        unhandled_events.each { |event| message << "  - #{event}" }
+      end
+
+      unless unknown_events.empty?
+        message << "" if unhandled_events.any?
+        message << "You gave handlers to these unknown events:"
+        unknown_events.each { |event| message << "  - #{event}" }
+      end
+
+      unless message.empty?
+        raise InvalidEventHandlers, message.join("\n")
       end
     end
 
-    def respond_to_missing?(method_name, include_all = false)
-      @event_names.include?(method_name) || super
+    def method_missing(event_name, &block)
+      register_event(event_name, &block)
     end
 
     def register_event(event_name, &block)
